@@ -33,6 +33,7 @@ import {
   type QRLoginSession,
   type QRLoginResult,
 } from '../../api/gomusic';
+import QRCode from 'react-native-qrcode-svg';
 
 // 5 个支持扫码的平台（与服务端 service.GetQRLoginSourceNames() 一致）
 // 注意：qq_wx 扫码成功后，cookie 实际写入到后端 cookies.json 的 'qq' 字段
@@ -295,33 +296,22 @@ function PlatformCard({
               <>
                 <View style={styles.qrImageWrap}>
                   {cardState.session.image_url ? (
+                    // QQ 等少数平台后端直接返 base64 PNG 二维码
                     <Image
                       source={{ uri: cardState.session.image_url }}
                       style={styles.qrImage}
                       resizeMode="contain"
                     />
-                  ) : (
-                    // 3 个平台（网易云/酷狗/B站）后端只返 url 不返图片
-                    // v25 改进：显示 url 文本 + "复制"按钮
-                    <View style={[styles.qrImage, styles.qrFallback]}>
-                      <Text style={styles.qrFallbackText} numberOfLines={8}>
-                        {cardState.session.url}
-                      </Text>
-                      <Pressable
-                        style={styles.qrCopyBtn}
-                        onPress={async () => {
-                          try {
-                            await Share.share({ message: cardState.session!.url });
-                          } catch {}
-                        }}
-                        hitSlop={8}
-                      >
-                        <Text style={styles.qrCopyBtnText}>
-                          {'分享 / 复制链接'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  )}
+                  ) : cardState.session.url ? (
+                    // 网易云/酷狗/B 站后端只返扫码内容 URL
+                    // v26：用 react-native-qrcode-svg 在前端生成 QR 码（无需新发后端）
+                    <QRCode
+                      value={cardState.session.url}
+                      size={220}
+                      backgroundColor="#ffffff"
+                      color="#000000"
+                    />
+                  ) : null}
                 </View>
                 <Text style={styles.qrHint}>
                   {cardState.state === 'success'
@@ -333,6 +323,22 @@ function PlatformCard({
                 <Text style={styles.qrSubHint}>
                   {t('qrHintDefault')}
                 </Text>
+                {/* 没图时同时给一个"分享 URL"按钮，方便用户复制到其他 App 扫码 */}
+                {!cardState.session.image_url && cardState.session.url && (
+                  <Pressable
+                    style={styles.qrCopyBtn}
+                    onPress={async () => {
+                      try {
+                        await Share.share({ message: cardState.session!.url });
+                      } catch {}
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.qrCopyBtnText}>
+                      {'分享 / 复制链接'}
+                    </Text>
+                  </Pressable>
+                )}
               </>
             )}
 
