@@ -18,6 +18,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTranslation } from '../../i18n/I18nProvider';
@@ -300,11 +301,25 @@ function PlatformCard({
                       resizeMode="contain"
                     />
                   ) : (
-                    // 某些平台 image_url 为空，让用户手动复制 url 用其他扫码工具
+                    // 3 个平台（网易云/酷狗/B站）后端只返 url 不返图片
+                    // v25 改进：显示 url 文本 + "复制"按钮
                     <View style={[styles.qrImage, styles.qrFallback]}>
-                      <Text style={styles.qrFallbackText} numberOfLines={6}>
+                      <Text style={styles.qrFallbackText} numberOfLines={8}>
                         {cardState.session.url}
                       </Text>
+                      <Pressable
+                        style={styles.qrCopyBtn}
+                        onPress={async () => {
+                          try {
+                            await Share.share({ message: cardState.session!.url });
+                          } catch {}
+                        }}
+                        hitSlop={8}
+                      >
+                        <Text style={styles.qrCopyBtnText}>
+                          {'分享 / 复制链接'}
+                        </Text>
+                      </Pressable>
                     </View>
                   )}
                 </View>
@@ -486,6 +501,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: fontSize.xs,
     textAlign: 'center',
+  },
+  qrCopyBtn: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+  },
+  qrCopyBtnText: {
+    color: colors.bg,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
   },
   qrHint: {
     color: colors.textPrimary,

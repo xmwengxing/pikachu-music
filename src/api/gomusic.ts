@@ -266,9 +266,15 @@ export async function setCookie(source: string, cookie: string): Promise<boolean
 export async function createQRSession(source: string): Promise<QRLoginSession | null> {
   const base = getGomusicBase();
   if (!base) return null;
-  const r = await jget<GOMusicEnvelope<QRLoginSession>>(
+  // v25 修复：原代码用 jget（默认 GET），但后端 endpoint 是 POST，导致所有平台扫码都失败
+  // 后端返回 {code, msg, data: QRLoginSession}
+  // 字段：source / key / url / image_url? / state? / expires_at? / extra?
+  // - netease/kugou/bilibili 只返 url（扫码内容）
+  // - qq 返 image_url（base64 PNG）
+  const r = await jpost<GOMusicEnvelope<QRLoginSession>>(
     base,
     `/system/qr_login/${encodeURIComponent(source)}`,
+    {},
   );
   return r?.code === 200 ? r.data ?? null : null;
 }

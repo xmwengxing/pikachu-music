@@ -170,12 +170,14 @@ const styles = StyleSheet.create({
     color: colors.bg,
   },
   iconBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.bg,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: colors.accent,
   },
   iconText: {
-    fontSize: 16,
+    // v25 修复：原本没设 color，在深色背景下 emoji 默认黑色看不清
+    fontSize: 18,
+    color: colors.accent,
   },
 });
