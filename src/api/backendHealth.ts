@@ -35,25 +35,45 @@ export async function testBackend(
     clearTimeout(tid);
     const latencyMs = Date.now() - start;
     if (!r.ok) {
-      return { ok: false, message: `HTTP ${r.status}`, latencyMs };
+      // 关键：把响应 body 前 100 字符附上，方便诊断 404 HTML / 401 等
+      let bodyHint = '';
+      try {
+        const t = await r.text();
+        bodyHint = t.slice(0, 100).replace(/\s+/g, ' ');
+      } catch {}
+      const hint = bodyHint ? ` · 响应: ${bodyHint}` : '';
+      return { ok: false, message: `HTTP ${r.status}${hint}`, latencyMs };
     }
     const j = await r.json().catch(() => null);
     if (!j || typeof j !== 'object') {
       return { ok: false, message: '响应不是 JSON', latencyMs };
     }
-    if (j.code !== 200) {
+    // 兼容几种合法响应：
+    //   {code: 200, msg, data}    → 正常信封
+    //   {}                         → 没 code 字段，可能是空响应
+    //   {code: undefined, ...}     → 中间层返的非标准 JSON
+    if (j.code === 200 || j.code === undefined) {
+      const cookiesCount = j.data ? Object.keys(j.data).length : 0;
+      return {
+        ok: true,
+        message: `连接成功 · ${cookiesCount} cookies`,
+        latencyMs,
+        cookiesCount,
+      };
+    }
+    if (typeof j.code === 'number') {
+      // 后端明确返了非 200 状态码
       return {
         ok: false,
-        message: `后端错误：${j.msg || 'code=' + j.code}`,
+        message: `后端错误：${j.msg || `code=${j.code}`}`,
         latencyMs,
       };
     }
-    const cookiesCount = j.data ? Object.keys(j.data).length : 0;
+    // code 字段类型异常（字符串等）
     return {
-      ok: true,
-      message: `连接成功 · ${cookiesCount} cookies`,
+      ok: false,
+      message: `响应异常：code=${String(j.code)}`,
       latencyMs,
-      cookiesCount,
     };
   } catch (e: any) {
     clearTimeout(tid);
