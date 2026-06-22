@@ -85,6 +85,7 @@ interface SettingsState {
   clearSearchHistory: () => void;
   setVolume: (v: number) => void;
   toggleMute: () => void;
+  setMuted: (b: boolean) => void;
   cyclePlayMode: () => void;
   setGomusicBaseUrl: (url: string) => void;
   /** 添加一个后端（自动 dedupe by url） */
@@ -177,6 +178,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)) }),
       toggleMute: () => set(s => ({ muted: !s.muted })),
+      setMuted: (b) => set({ muted: b }),
       cyclePlayMode: () => set(s => {
         const order: PlayMode[] = ['list', 'random', 'single'];
         const idx = order.indexOf(s.playMode);
