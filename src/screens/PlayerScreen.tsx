@@ -35,6 +35,7 @@ import { downloadTrackToLocal, shareSavedFile, guessMimeFromExt } from '../api/d
 import { colors, fontSize, spacing, radius, globalStyles } from '../theme';
 import { sourceKey } from '../utils/platforms';
 import { parseLRC } from '../utils/lrc';
+import { LyricLine as LyricLineNew, LyricsParticleFx } from '../components/lyrics';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
@@ -208,32 +209,6 @@ export default function PlayerScreen() {
   );
 }
 
-function LyricLine({ text, active, alt, onPress }: { text: string; active: boolean; alt?: boolean; mode?: 'classic' | 'glow' | 'particles'; onPress?: () => void }) {
-  const progress = useSharedValue(active ? 1 : 0);
-  useEffect(() => {
-    progress.value = withTiming(active ? 1 : 0, { duration: 150 });
-  }, [active]);
-  const animatedStyle = useAnimatedStyle(() => {
-    const color = interpolateColor(progress.value, [0, 1], [colors.textMuted, alt ? colors.accentAlt : colors.accent]);
-    return {
-      color,
-      opacity: 0.5 + 0.5 * progress.value,
-      transform: [{ scale: 0.95 + 0.1 * progress.value }],
-    };
-  });
-  const Content = (
-    <AnimatedText style={[styles.lyricLine, animatedStyle, active && alt && { fontWeight: '700' }]}>
-      {text}
-    </AnimatedText>
-  );
-  if (!onPress) return Content;
-  return (
-    <Pressable onPress={onPress} hitSlop={8}>
-      {Content}
-    </Pressable>
-  );
-}
-
 /**
  * LyricScroller —— 歌词滚动容器
  *
@@ -248,10 +223,6 @@ function LyricScroller({ currentLineIdx, mode, onSeek }: {
   mode?: 'classic' | 'glow' | 'particles';
   onSeek: (sec: number) => void;
 }) {
-  // 兼容旧版 alt 入参：migrate 时如果还有人传 boolean，把它当 mode='glow'/'particles' 看待
-  // （实际新调用都传 mode，不再传 alt；保留这个宽松避免 breaking）
-  const effectiveAlt = mode === 'glow' || mode === 'particles';
-
   const { t } = useTranslation();
   const player = usePlayerStore();
   const listRef = useRef<FlatList<{ text: string; time: number }>>(null);
@@ -286,50 +257,54 @@ function LyricScroller({ currentLineIdx, mode, onSeek }: {
   }
 
   return (
-    <FlatList
-      ref={listRef}
-      style={styles.lyricsScroll}
-      data={data}
-      keyExtractor={(_, idx) => String(idx)}
-      // 关键：getItemLayout 让 FlatList 不需要测量就能精确滚动，
-      // 用一个保守的行高估值（fontSize.md=14 + paddingVertical:4×2 = 22，外加 line-height 1.3 ≈ 28）
-      // 不准也没关系 —— scrollToIndex 失败会 fallback 到 onScrollToIndexFailed
-      getItemLayout={(_, index) => ({ length: 28, offset: 28 * index, index })}
-      onScrollToIndexFailed={({ index }) => {
-        // 第一次渲染时 FlatList 可能还没量到 item，回退到延迟重试
-        setTimeout(() => {
-          try {
-            listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
-          } catch {}
-        }, 100);
-      }}
-      onScrollBeginDrag={() => {
-        isUserDragging.current = true;
-      }}
-      onScrollEndDrag={() => {
-        dragPauseUntil.current = Date.now() + 2500;
-        setTimeout(() => { isUserDragging.current = false; }, 100);
-      }}
-      onMomentumScrollEnd={() => {
-        isUserDragging.current = false;
-      }}
-      renderItem={({ item, index }) => (
-        <LyricLine
-          text={item.text}
-          active={index === currentLineIdx}
-          alt={effectiveAlt}
-          mode={mode}
-          onPress={() => onSeek(item.time)}
-        />
-      )}
-      // 列表上下各加一段空行，让高亮行能真正滚到可视中点
-      ListHeaderComponent={<View style={{ height: 120 }} />}
-      ListFooterComponent={<View style={{ height: 200 }} />}
-      showsVerticalScrollIndicator
-      // 性能：歌词行数一般 < 100，不需要虚拟化也很快；明确关掉以避免跨行测量误差
-      initialNumToRender={50}
-      windowSize={7}
-    />
+    <View style={styles.lyricsScroll}>
+      {/* particles 模式：Skia 粒子背景层（absolute + pointerEvents none） */}
+      {mode === 'particles' && <LyricsParticleFx currentLineIdx={currentLineIdx} />}
+      {/* 歌词 FlatList 在粒子层之上 */}
+      <FlatList
+        ref={listRef}
+        style={styles.lyricsFlatList}
+        data={data}
+        keyExtractor={(_, idx) => String(idx)}
+        // 关键：getItemLayout 让 FlatList 不需要测量就能精确滚动，
+        // 用一个保守的行高估值（fontSize.md=14 + paddingVertical:4×2 = 22，外加 line-height 1.3 ≈ 28）
+        // 不准也没关系 —— scrollToIndex 失败会 fallback 到 onScrollToIndexFailed
+        getItemLayout={(_, index) => ({ length: 28, offset: 28 * index, index })}
+        onScrollToIndexFailed={({ index }) => {
+          // 第一次渲染时 FlatList 可能还没量到 item，回退到延迟重试
+          setTimeout(() => {
+            try {
+              listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+            } catch {}
+          }, 100);
+        }}
+        onScrollBeginDrag={() => {
+          isUserDragging.current = true;
+        }}
+        onScrollEndDrag={() => {
+          dragPauseUntil.current = Date.now() + 2500;
+          setTimeout(() => { isUserDragging.current = false; }, 100);
+        }}
+        onMomentumScrollEnd={() => {
+          isUserDragging.current = false;
+        }}
+        renderItem={({ item, index }) => (
+          <LyricLineNew
+            text={item.text}
+            active={index === currentLineIdx}
+            mode={mode}
+            onPress={() => onSeek(item.time)}
+          />
+        )}
+        // 列表上下各加一段空行，让高亮行能真正滚到可视中点
+        ListHeaderComponent={<View style={{ height: 120 }} />}
+        ListFooterComponent={<View style={{ height: 200 }} />}
+        showsVerticalScrollIndicator
+        // 性能：歌词行数一般 < 100，不需要虚拟化也很快；明确关掉以避免跨行测量误差
+        initialNumToRender={50}
+        windowSize={7}
+      />
+    </View>
   );
 }
 
@@ -514,6 +489,8 @@ const styles = StyleSheet.create({
   volTrack: { height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
   volFill: { height: '100%', backgroundColor: colors.accent },
   lyricsContainer: { marginTop: spacing.xl, backgroundColor: colors.bgElevated, borderRadius: radius.md, padding: spacing.md },
-  lyricsScroll: { maxHeight: 320 },
+  lyricsScroll: { maxHeight: 320, position: 'relative' },
+  /** FlatList 透明 + 高度撑满，让上层粒子 (absolute) 能透出来 */
+  lyricsFlatList: { flex: 1 },
   lyricLine: { fontSize: fontSize.md, textAlign: 'center', paddingVertical: 4 },
 });
