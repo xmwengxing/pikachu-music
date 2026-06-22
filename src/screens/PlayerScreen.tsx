@@ -156,7 +156,11 @@ export default function PlayerScreen() {
 
         {/* 控制行：播放按钮组（主）+ 音量/L 按钮（次）—— 两行避免挤 */}
         <View style={styles.controlMainRow}>
-          <PressableCtrlBtn icon="🔀" onPress={settings.cyclePlayMode} active={settings.playMode !== 'list'} />
+          <PressableCtrlBtn
+            icon={settings.playMode === 'random' ? '🔀' : settings.playMode === 'single' ? '🔂' : '🔁'}
+            onPress={settings.cyclePlayMode}
+            active={settings.playMode !== 'list'}
+          />
           <PressableCtrlBtn icon="⏮" onPress={tp.previous} />
           <PrimaryPlayBtn isPlaying={tp.isPlaying} onPress={tp.togglePlay} loading={tp.isBuffering} />
           <PressableCtrlBtn icon="⏭" onPress={tp.next} />
@@ -164,7 +168,7 @@ export default function PlayerScreen() {
           <PressableCtrlBtn icon="💾" onPress={() => setAddOpen(true)} />
         </View>
         <View style={styles.controlSecondaryRow}>
-          <Pressable onPress={settings.toggleMute} hitSlop={8}>
+          <Pressable onPress={tp.toggleMute} hitSlop={8}>
             <Text style={styles.muteIcon}>{settings.muted || settings.volume === 0 ? '🔇' : settings.volume < 0.5 ? '🔈' : '🔊'}</Text>
           </Pressable>
           <View style={styles.volWrap}>
@@ -175,14 +179,23 @@ export default function PlayerScreen() {
             onPress={handleDownload}
             active={downloading}
           />
-          <PressableCtrlBtn icon="L" onPress={player.toggleLyricsAlt} active={player.lyricsAlt} small />
+          <PressableCtrlBtn
+            icon={`L${player.lyricsMode === 'classic' ? '1' : player.lyricsMode === 'glow' ? '2' : '3'}`}
+            onPress={player.cycleLyricsMode}
+            active={player.lyricsMode !== 'classic'}
+            small
+          />
         </View>
 
         <View style={styles.lyricsContainer}>
           <Text style={[globalStyles.textMuted, { marginBottom: spacing.sm }]}>
             {t('lyricsTitle')} · {track.lrc ? `已加载 ${player.lyricLines.length} 行` : t('noLyrics')}
           </Text>
-          <LyricScroller currentLineIdx={currentLineIdx} alt={player.lyricsAlt} onSeek={tp.seekTo} />
+          <LyricScroller
+            currentLineIdx={currentLineIdx}
+            mode={player.lyricsMode}
+            onSeek={tp.seekTo}
+          />
         </View>
       </View>
 
@@ -195,7 +208,7 @@ export default function PlayerScreen() {
   );
 }
 
-function LyricLine({ text, active, alt, onPress }: { text: string; active: boolean; alt: boolean; onPress?: () => void }) {
+function LyricLine({ text, active, alt, onPress }: { text: string; active: boolean; alt?: boolean; mode?: 'classic' | 'glow' | 'particles'; onPress?: () => void }) {
   const progress = useSharedValue(active ? 1 : 0);
   useEffect(() => {
     progress.value = withTiming(active ? 1 : 0, { duration: 150 });
@@ -230,7 +243,15 @@ function LyricLine({ text, active, alt, onPress }: { text: string; active: boole
  *   - viewPosition: 0.5 = 行中点对齐可视中点，跨设备/字号一致
  *   - 用户拖动时 FlatList 自动处理 overscroll，停止 2.5s 后程序接管
  */
-function LyricScroller({ currentLineIdx, alt, onSeek }: { currentLineIdx: number; alt: boolean; onSeek: (sec: number) => void }) {
+function LyricScroller({ currentLineIdx, mode, onSeek }: {
+  currentLineIdx: number;
+  mode?: 'classic' | 'glow' | 'particles';
+  onSeek: (sec: number) => void;
+}) {
+  // 兼容旧版 alt 入参：migrate 时如果还有人传 boolean，把它当 mode='glow'/'particles' 看待
+  // （实际新调用都传 mode，不再传 alt；保留这个宽松避免 breaking）
+  const effectiveAlt = mode === 'glow' || mode === 'particles';
+
   const { t } = useTranslation();
   const player = usePlayerStore();
   const listRef = useRef<FlatList<{ text: string; time: number }>>(null);
@@ -296,7 +317,8 @@ function LyricScroller({ currentLineIdx, alt, onSeek }: { currentLineIdx: number
         <LyricLine
           text={item.text}
           active={index === currentLineIdx}
-          alt={alt}
+          alt={effectiveAlt}
+          mode={mode}
           onPress={() => onSeek(item.time)}
         />
       )}
