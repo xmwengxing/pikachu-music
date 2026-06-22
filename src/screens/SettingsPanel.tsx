@@ -207,6 +207,12 @@ function BackendSection() {
   /** 正在测试中的 id */
   const [testingId, setTestingId] = useState<string | null>(null);
 
+  // v1.0.26: 新装用户 backends=[]，baseUrl='' → 显式提示。
+  // 这里同时考虑 gomusicBaseUrl（旧字段，兼容老用户）。
+  const hasAnyBackend =
+    (settings.backends && settings.backends.length > 0) ||
+    !!(settings.gomusicBaseUrl && settings.gomusicBaseUrl.trim());
+
   const handleTest = async (b: Backend) => {
     setTestingId(b.id);
     const r = await testBackend(b.url);
@@ -244,6 +250,17 @@ function BackendSection() {
       <Text style={styles.hint}>
         {t('backendHint') || '选择/添加聚合后端地址。空 = 关闭聚合回落到咪咕/网易云/QQ/酷我 4 个老平台。点"测试"验证连通。'}
       </Text>
+
+      {!hasAnyBackend && (
+        <View style={styles.emptyBackendCard}>
+          <Text style={styles.emptyBackendCardTitle}>
+            ⚠ {t('settingsBackendUrlEmptyHint') || '未配置后端 API 地址'}
+          </Text>
+          <Text style={styles.emptyBackendCardHint}>
+            {t('settingsBackendUrlEmptyHintDoc') || '部署文档：docs/GOMUSIC-API-DEPLOY.md'}
+          </Text>
+        </View>
+      )}
 
       {settings.backends.map(b => {
         const active = (settings.activeBackendId || settings.backends[0]?.id) === b.id;
@@ -677,5 +694,27 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
+  },
+
+  // v1.0.26: baseUrl 空时显示的提示卡片
+  emptyBackendCard: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: colors.warning,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  emptyBackendCardTitle: {
+    color: colors.warning,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  emptyBackendCardHint: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
   },
 });
