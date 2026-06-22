@@ -182,6 +182,8 @@ function gomusicSongToTrack(s: GOMusicSong, tag: string, keyword: string, idx: n
     duration: s.duration || 0,
     quality: q?.tag || null,
     qualityLabel: q?.label || (s.bitrate ? `${s.bitrate}kbps` : null),
+    // v24 修复：复制 extra 字段（部分源如 migu 需要 content_id 才能取歌词）
+    extra: s.extra && Object.keys(s.extra).length > 0 ? s.extra : undefined,
   };
 }
 
@@ -191,6 +193,12 @@ export async function fetchDetails(track: Track, platformOverride?: string): Pro
   const platform = platformOverride || track.platform || (TAG_TO_GOMUSIC[track.source] ?? track.source);
   const sid = track.songid || '';
   if (!sid) throw new Error(track.source + ' no songid');
+
+  // v24 修复：把 track.extra 透传到后端 lyric 接口（部分源如 migu 需要 content_id）
+  // 后端 parseSongExtraQuery (handler/music.go:73-107) 支持 ?extra=<urlencoded JSON>
+  const extraParam = track.extra
+    ? `&extra=${encodeURIComponent(JSON.stringify(track.extra))}`
+    : '';
 
   const urlR = await jget<GOMusicResponse<{ url: string }>>(
     base,
@@ -206,7 +214,7 @@ export async function fetchDetails(track: Track, platformOverride?: string): Pro
   if (!track.lrc) {
     const lrcR = await jget<GOMusicResponse<{ lyric: string }>>(
       base,
-      `/music/lyric?id=${encodeURIComponent(sid)}&source=${encodeURIComponent(platform)}`,
+      `/music/lyric?id=${encodeURIComponent(sid)}&source=${encodeURIComponent(platform)}${extraParam}`,
     );
     if (lrcR?.code === 200 && lrcR.data?.lyric) {
       track.lrc = lrcR.data.lyric;

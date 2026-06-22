@@ -59,6 +59,31 @@ export async function searchMigu(kw: string, limit = 10): Promise<Track[]> {
   }));
 }
 
+/**
+ * v24 修复：从 gomusic 后端拿歌词（替代老 API 的 lyric 接口，后者对 gomusic 返回的 id 不完全兼容）
+ * - 成功就覆盖 track.lrc；失败保持原状让 legacy 兜底
+ * - 静默失败（不抛异常）
+ */
+async function tryGomusicLyric(track: Track, source: string): Promise<void> {
+  const sid = track.songid;
+  if (!sid) return;
+  try {
+    const gomusicBase = (await import('./gomusic')).getGomusicBase();
+    if (!gomusicBase) return;
+    const extraParam = track.extra
+      ? `&extra=${encodeURIComponent(JSON.stringify(track.extra))}`
+      : '';
+    const r = await getJSON<{ code: number; data?: { lyric?: string } }>(
+      `${gomusicBase}/music/lyric?id=${encodeURIComponent(sid)}&source=${source}${extraParam}`,
+    );
+    if (r && r.code === 200 && r.data?.lyric) {
+      track.lrc = r.data.lyric;
+    }
+  } catch {
+    // 静默
+  }
+}
+
 export async function fetchMiguDetails(track: Track): Promise<Track> {
   const n = track.songid || '';
   // 1) gomusic 优先
@@ -71,6 +96,8 @@ export async function fetchMiguDetails(track: Track): Promise<Track> {
           track.audioUrl = r1.data.url;
           track.platform = 'migu';
           track.detailsLoaded = true;
+          // v24 修复：gomusic lyric 作为主路径
+          await tryGomusicLyric(track, 'migu');
           return track;
         }
       } catch {}
@@ -95,6 +122,8 @@ export async function fetchMiguDetails(track: Track): Promise<Track> {
         if (lr.ok) track.lrc = await lr.text();
       } catch {}
     }
+    // v24 兜底：gomusic 后端没拿到的，legacy 老 API 也试一遍
+    if (!track.lrc) await tryGomusicLyric(track, 'migu');
   } catch {
     // 咪咕 server 可能挂或 CORS——静默
   }
@@ -149,6 +178,8 @@ export async function fetchNeteaseDetails(track: Track): Promise<Track> {
           track.audioUrl = r1.data.url;
           track.platform = 'netease';
           track.detailsLoaded = true;
+          // v24：主路径优先用 gomusic lyric
+          await tryGomusicLyric(track, 'netease');
           return track;
         }
       } catch {}
@@ -184,6 +215,8 @@ export async function fetchNeteaseDetails(track: Track): Promise<Track> {
   } catch {
     // 静默
   }
+  // v24：legacy 没拿到，gomusic 兜底
+  if (!track.lrc) await tryGomusicLyric(track, 'netease');
   track.detailsLoaded = true;
   return track;
 }
@@ -265,22 +298,16 @@ export async function fetchQQDetails(track: Track): Promise<Track> {
     try {
       const urlApi = `${gomusicBase}/music/url?id=${encodeURIComponent(mid)}&source=qq`;
       const r1 = await getJSON<{ code: number; data?: { url?: string } }>(urlApi);
-      if (r1 && r1.code === 200 && r1.data && r1.data.url) {
-        track.audioUrl = r1.data.url;
-        track.platform = 'qq';
-        if (!track.lrc) {
-          try {
-            const r2 = await getJSON<{ code: number; data?: { lyric?: string } }>(
-              `${gomusicBase}/music/lyric?id=${encodeURIComponent(mid)}&source=qq`,
-            );
-            if (r2 && r2.code === 200 && r2.data && r2.data.lyric) {
-              track.lrc = r2.data.lyric;
-            }
-          } catch {}
+if (r1 && r1.code === 200 && r1.data && r1.data.url) {
+          track.audioUrl = r1.data.url;
+          track.platform = 'qq';
+          if (!track.lrc) {
+            // v24：改用 helper（带 extra 透传）
+            await tryGomusicLyric(track, 'qq');
+          }
+          track.detailsLoaded = true;
+          if (track.audioUrl) return track;
         }
-        track.detailsLoaded = true;
-        if (track.audioUrl) return track;
-      }
     } catch (e: any) {
       // gomusic 调用本身失败（连不上 / 5xx），不阻断，继续走 tang
       console.warn('[QQ] gomusic path failed:', e?.message || e);
@@ -321,6 +348,8 @@ export async function fetchQQDetails(track: Track): Promise<Track> {
     else if (found.song_play_url_hq) track.audioUrl = found.song_play_url_hq;
     else if (found.song_play_url_standard) track.audioUrl = found.song_play_url_standard;
     if (found.song_lyric) track.lrc = found.song_lyric;
+    // v24：tang 没拿到，gomusic 兜底
+    if (!track.lrc) await tryGomusicLyric(track, 'qq');
     if (found.album_pic) track.cover = found.album_pic;
     if (found.kbps) {
       const kbps = parseInt(found.kbps);
@@ -423,6 +452,8 @@ export async function fetchKuwoDetails(track: Track): Promise<Track> {
           track.audioUrl = r1.data.url;
           track.platform = 'kugou';
           track.detailsLoaded = true;
+          // v24：主路径优先 gomusic lyric
+          await tryGomusicLyric(track, 'kugou');
           return track;
         }
       } catch {}
@@ -440,6 +471,8 @@ export async function fetchKuwoDetails(track: Track): Promise<Track> {
     if (d.url) track.audioUrl = d.url;
     // 歌词嵌在 detail 响应里（d.lyric 是完整 LRC 字符串）
     if (d.lyric) track.lrc = d.lyric;
+    // v24：legacy 没拿到，gomusic 兜底
+    if (!track.lrc) await tryGomusicLyric(track, 'kugou');
     // 音质
     if (d.bitrate) {
       const kbps = parseInt(String(d.bitrate));
