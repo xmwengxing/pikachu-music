@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DarkTheme as NavDarkTheme } from '@react-navigation/native';
@@ -21,7 +21,7 @@ import { ensureLocalBackend, addBackendListener } from './src/api/backend';
 import SettingsPanel from './src/screens/SettingsPanel';
 import { useUIStore } from './src/state/uiStore';
 import { useSettingsStore } from './src/state/settingsStore';
-import { getGomusicBase } from './src/api/gomusic';
+import { syncCookiesFromBackend } from './src/api/cookieSync';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -40,32 +40,31 @@ export default function App() {
   }, []);
 
   /**
-   * 后端预热（v21+）
-   * - App 启动 3 秒后：后台 ping 当前激活后端，避免首次搜索时的冷启动等待
-   * - activeBackendId 变化时（用户在设置里切换后端）：立即预热
-   * - 失败不弹错（用户可能没填后端，正常）
+   * cookie 同步（v1.0.26）
+   * - 启动 3 秒后拉一次
+   * - AppState 回到 'active' 时拉一次（用户从后台切回）
+   * - activeBackendId 变化时立即拉一次（用户切换后端）
+   * - 失败静默（baseUrl 为空、fetch 抛错都吞掉）
    */
   useEffect(() => {
-    const warmup = () => {
-      const base = getGomusicBase();
-      if (!base) return;
-      // GET /system/cookies 是轻量端点；同时也起到"暖机"目的
-      fetch(base.replace(/\/+$/, '') + '/system/cookies')
-        .catch(() => { /* 静默失败，不影响 UI */ });
+    const t = setTimeout(() => {
+      syncCookiesFromBackend().catch(() => {});
+    }, 3000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        syncCookiesFromBackend().catch(() => {});
+      }
+    });
+    return () => {
+      clearTimeout(t);
+      sub.remove();
     };
-    // 首次：3 秒后（避开启动初期的网络初始化）
-    const t = setTimeout(warmup, 3000);
-    return () => clearTimeout(t);
   }, []);
 
-  // 监听后端切换：activeBackendId 变化 → 立即预热
   const activeId = useSettingsStore((s) => s.activeBackendId);
   useEffect(() => {
     if (!activeId) return;
-    const base = getGomusicBase();
-    if (!base) return;
-    fetch(base.replace(/\/+$/, '') + '/system/cookies')
-      .catch(() => {});
+    syncCookiesFromBackend().catch(() => {});
   }, [activeId]);
 
   if (!ready) {
