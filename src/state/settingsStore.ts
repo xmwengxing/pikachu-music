@@ -16,8 +16,8 @@ const asyncStorageZustand: StateStorage = {
 const DEFAULT_ENABLED: Record<string, boolean> = PLATFORMS
   .filter(p => !p.hidden && !p.loginOnly)
   .reduce((acc, p) => {
-    // 默认开启主平台（聚合源开，bilibili/qianqian/soda/fivesing/jamendo/joox 默认关）
-    acc[p.id] = ['migu', 'netease', 'qq', 'kugou', 'kuwo', 'gomusic'].includes(p.id);
+    // v1.0.26: 默认开启主平台（聚合源默认关，新装用户需在设置里填入后端地址后手动开启）
+    acc[p.id] = ['migu', 'netease', 'qq', 'kugou', 'kuwo'].includes(p.id);
     return acc;
   }, {} as Record<string, boolean>);
 
@@ -40,21 +40,11 @@ export interface Backend {
   createdAt: number;
 }
 
-// 内置默认后端
-// 仅含 Render 官方免费部署（公开、任何用户都能访问、有 15s 冷启动）
-// 用户自建后端（本地 + Cloudflare Tunnel）请按 docs/TUNNEL-SETUP.md 部署后
-// 在设置里手动添加。新装 APK 不含任何私有/维护者后端地址。
-const DEFAULT_RENDER_BACKEND: Backend = {
-  id: 'render-default',
-  name: 'Render 默认',
-  url: 'https://pikachu-music-api.onrender.com/api/v1',
-  isDefault: true,
-  createdAt: 0,
-};
-const DEFAULT_BACKENDS: Backend[] = [DEFAULT_RENDER_BACKEND];
-
-// 内置默认 active id
-const DEFAULT_ACTIVE_ID = DEFAULT_RENDER_BACKEND.id;
+// v1.0.26：移除 Render 默认后端。
+// 新装用户拿到的 backends 是空数组，必须在设置里自行添加/填写后端地址。
+// 升级用户的旧值通过 persist 的 partialize 字段保留，不写新 migrate。
+const DEFAULT_BACKENDS: Backend[] = [];
+const DEFAULT_ACTIVE_ID: string | null = null;
 
 interface SettingsState {
   language: Lang;
@@ -131,9 +121,9 @@ export const useSettingsStore = create<SettingsState>()(
       searchHistory: [],
       volume: 1,
       muted: false,
-      gomusicBaseUrl: 'https://pikachu-music-api.onrender.com/api/v1',
-      backends: DEFAULT_BACKENDS,
-      activeBackendId: DEFAULT_ACTIVE_ID,
+      gomusicBaseUrl: '',           // v1.0.26: 新装用户无默认 Render 地址
+      backends: DEFAULT_BACKENDS,   // []
+      activeBackendId: DEFAULT_ACTIVE_ID, // null
       localBackendEnabled: false, // 本地后端已禁用，仅保留 UI 占位
       localBackendSources: DEFAULT_LOCAL_SOURCES,
       cookieBackup: {},
@@ -263,10 +253,11 @@ export const useSettingsStore = create<SettingsState>()(
         if (!persisted || typeof persisted !== 'object') return persisted;
         const next: any = { ...persisted };
         if (!Array.isArray(next.backends) || next.backends.length === 0) {
+          // v1.0.26: 数据残缺时不再 fallback 到 Render 默认（已删除），新装/兜底均给空
           next.backends = DEFAULT_BACKENDS;
         }
         if (!next.activeBackendId) {
-          next.activeBackendId = DEFAULT_RENDER_BACKEND.id;
+          next.activeBackendId = DEFAULT_ACTIVE_ID;
         }
         return next;
       },
@@ -277,7 +268,7 @@ export const useSettingsStore = create<SettingsState>()(
           state.backends = DEFAULT_BACKENDS;
         }
         if (!state.activeBackendId) {
-          state.activeBackendId = DEFAULT_RENDER_BACKEND.id;
+          state.activeBackendId = DEFAULT_ACTIVE_ID;
         }
       },
       partialize: (s) => ({
