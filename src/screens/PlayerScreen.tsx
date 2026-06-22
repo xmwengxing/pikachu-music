@@ -263,7 +263,7 @@ function LyricScroller({ currentLineIdx, mode, onSeek }: {
       {/* 歌词 FlatList 在粒子层之上 */}
       <FlatList
         ref={listRef}
-        style={styles.lyricsFlatList}
+        style={styles.lyricsScrollInner}
         data={data}
         keyExtractor={(_, idx) => String(idx)}
         // 关键：getItemLayout 让 FlatList 不需要测量就能精确滚动，
@@ -489,8 +489,9 @@ const styles = StyleSheet.create({
   volTrack: { height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
   volFill: { height: '100%', backgroundColor: colors.accent },
   lyricsContainer: { marginTop: spacing.xl, backgroundColor: colors.bgElevated, borderRadius: radius.md, padding: spacing.md },
-  lyricsScroll: { maxHeight: 320, position: 'relative' },
-  /** FlatList 透明 + 高度撑满，让上层粒子 (absolute) 能透出来 */
-  lyricsFlatList: { flex: 1 },
+  /** 歌词外层容器：固定高度 320，relative 让 absolute 粒子层能相对它定位 */
+  lyricsScroll: { height: 320, position: 'relative' },
+  /** FlatList 透明，撑满外层容器 */
+  lyricsScrollInner: { flex: 1, backgroundColor: 'transparent' },
   lyricLine: { fontSize: fontSize.md, textAlign: 'center', paddingVertical: 4 },
 });
