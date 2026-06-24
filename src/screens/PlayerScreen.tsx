@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
+  Platform,
   View,
   Text,
   Image,
@@ -34,10 +35,21 @@ import Header from '../components/header/Header';
 import { downloadTrackToLocal, shareSavedFile, guessMimeFromExt } from '../api/downloader';
 import { colors, fontSize, spacing, radius, globalStyles } from '../theme';
 import { sourceKey } from '../utils/platforms';
-import { parseLRC } from '../utils/lrc';
 import { LyricLine as LyricLineNew, LyricsParticleFx } from '../components/lyrics';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
+
+/**
+ * 跨平台 toast：web 平台没有 ToastAndroid，console.warn 兜底。
+ * 后续 Phase B 接 tauri-plugin-dialog 后，web 端可以从这里升级为 in-app toast UI。
+ */
+function showToast(msg: string, long = false) {
+  if (Platform.OS === 'web') {
+    console.warn('[toast]', msg);
+    return;
+  }
+  ToastAndroid.show(msg, long ? ToastAndroid.LONG : ToastAndroid.SHORT);
+}
 
 export default function PlayerScreen() {
   const { t } = useTranslation();
@@ -46,16 +58,6 @@ export default function PlayerScreen() {
   const tp = useTrackPlayer();
   // 设置面板已在 App 根统一 mount，这里只取 openSettings 即可
   const openSettings = useUIStore((s) => s.openSettings);
-
-  useEffect(() => {
-    if (!player.currentTrack) return;
-    const track = player.currentTrack;
-    if (track.lrc) {
-      player.setLyrics(parseLRC(track.lrc));
-    } else {
-      player.setLyrics([]);
-    }
-  }, [player.currentTrack?.uid]);
 
   const currentLineIdx = useMemo(() => {
     if (!player.lyricLines.length) return -1;
@@ -78,17 +80,17 @@ export default function PlayerScreen() {
   const handleDownload = async () => {
     if (downloading) return;
     if (!track.audioUrl) {
-      ToastAndroid.show(t('downloadNoUrl') || '当前歌曲还未加载完成', ToastAndroid.SHORT);
+      showToast(t('downloadNoUrl') || '当前歌曲还未加载完成');
       return;
     }
     setDownloading(true);
-    ToastAndroid.show(t('downloadStarting') || '开始下载…', ToastAndroid.SHORT);
+    showToast(t('downloadStarting') || '开始下载…');
     const res = await downloadTrackToLocal(track);
     if (!res.ok) {
       setDownloading(false);
-      ToastAndroid.show(
+      showToast(
         `${t('downloadFailed') || '下载失败'}：${res.error || ''}`.slice(0, 200),
-        ToastAndroid.LONG,
+        true,
       );
       return;
     }
@@ -97,10 +99,10 @@ export default function PlayerScreen() {
     const shared = await shareSavedFile(res.localUri!, mime, t('downloadTitle') || '保存到设备');
     setDownloading(false);
     if (!shared) {
-      ToastAndroid.show(t('downloadNotSupported') || '当前平台不支持分享', ToastAndroid.SHORT);
+      showToast(t('downloadNotSupported') || '当前平台不支持分享');
       return;
     }
-    ToastAndroid.show(t('downloadSuccess') || '已保存到本地，请选择保存位置', ToastAndroid.LONG);
+    showToast(t('downloadSuccess') || '已保存到本地，请选择保存位置', true);
   };
 
   if (!player.currentTrack) {
@@ -229,6 +231,10 @@ function LyricScroller({ currentLineIdx, mode, onSeek }: {
   const isUserDragging = useRef<boolean>(false);
   const dragPauseUntil = useRef<number>(0);
 
+  // 真实容器尺寸（用 onLayout 拿到，<Canvas> 不会自动撑满父布局）
+  // 传给 LyricsParticleFx 当作粒子中心点计算的依据
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+
   useEffect(() => {
     if (currentLineIdx < 0) return;
     if (isUserDragging.current) return;
@@ -257,9 +263,23 @@ function LyricScroller({ currentLineIdx, mode, onSeek }: {
   }
 
   return (
-    <View style={styles.lyricsScroll}>
+    <View
+      style={styles.lyricsScroll}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setContainerSize((prev) =>
+          prev && prev.width === width && prev.height === height ? prev : { width, height }
+        );
+      }}
+    >
       {/* particles 模式：Skia 粒子背景层（absolute + pointerEvents none） */}
-      {mode === 'particles' && <LyricsParticleFx currentLineIdx={currentLineIdx} />}
+      {mode === 'particles' && (
+        <LyricsParticleFx
+          currentLineIdx={currentLineIdx}
+          width={containerSize?.width}
+          height={containerSize?.height}
+        />
+      )}
       {/* 歌词 FlatList 在粒子层之上 */}
       <FlatList
         ref={listRef}

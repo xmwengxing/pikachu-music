@@ -1,0 +1,28 @@
+[package]
+name = "pikachu-music"
+version = "1.0.27"
+description = "皮卡丘的音乐站 · Pikachu Music (Tauri 壳 + Expo Web 前端)"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "pikachu_music_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+# Phase B：保存音乐到本地需要文件系统 dialog
+# 替代之前 web 端硬降级 stub —— 真实"用户选保存位置"流程
+tauri-plugin-dialog = "2"
+# Phase B 续：dialog 选完位置后，Rust 端从远端 URL 拉音频写文件
+# 用 rustls 避免 OpenSSL 跨平台依赖，tls 特性启用 HTTPS
+ureq = { version = "2", default-features = false, features = ["tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync"] }

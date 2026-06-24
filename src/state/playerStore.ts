@@ -3,7 +3,7 @@
 // v1.0.26+: lyricsAlt:boolean → lyricsMode:'classic'|'glow'|'particles'，L 键循环 3 模式
 import { create } from 'zustand';
 import type { Track, PlayContext } from '../api/types';
-import type { LyricLine } from '../utils/lrc';
+import { parseLRC, type LyricLine } from '../utils/lrc';
 
 export type LyricsMode = 'classic' | 'glow' | 'particles';
 const LYRICS_MODE_ORDER: LyricsMode[] = ['classic', 'glow', 'particles'];
@@ -51,7 +51,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     currentTrack: track,
     playContext: ctx,
     isPlaying: true,
-    lyricLines: [],
+    lyricLines: track.lrc ? parseLRC(track.lrc) : [],
     playOnLoad: true, // 默认自动播放
   }),
   setIsPlaying: (b) => set({ isPlaying: b }),

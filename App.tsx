@@ -11,6 +11,8 @@ import { View, Text, StyleSheet, ActivityIndicator, AppState } from 'react-nativ
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, DarkTheme as NavDarkTheme } from '@react-navigation/native';
+// CanvasKit 由 index.ts 在 import App 之前装好（global.CanvasKit）。
+// App.tsx 这里不再调 LoadSkiaWeb，否则 skia 模块的顶层 Skia 单例已坏。
 import { setupTrackPlayer } from './src/hooks/useTrackPlayer';
 import { navigationRef } from './src/navigation/navRef';
 import RootNavigator from './src/navigation/RootNavigator';

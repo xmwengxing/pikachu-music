@@ -42,10 +42,11 @@ jobs:
       - name: Build Tauri Windows installer
         # 不用 tauri-apps/tauri-action@v0 那个 action —— 它是给 Tauri 1 写的，
         # 会硬装 @tauri-apps/cli@v1 然后跑 `tauri init --ci`，跟我们 Tauri 2 + 已有项目冲突。
-        # 直接走我们自己的脚本（package.json 里 tauri:build:win）用本地装的 CLI v2。
+        # 直接调 npx tauri build（用 npm ci 装到 node_modules 的本地 @tauri-apps/cli v2），
+        # 不依赖 package.json 里的 tauri:build:win 脚本（master 分支上可能还没那个 script）。
         # beforeBuildCommand 由 tauri build 自己触发（`cd .. && npx expo export --platform web`），
         # MSVC + WebView2 windows-latest runner 都已经预装好。
-        run: npm run tauri:build:win
+        run: npx tauri build --bundles nsis,msi
         shell: pwsh
 
       - name: Verify installer artifacts exist

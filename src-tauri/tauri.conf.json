@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "pikachu-music",
+  "version": "1.0.27",
+  "identifier": "com.pikachu.music",
+  "build": {
+    "beforeDevCommand": "cd .. && npx expo start --web --port 1420",
+    "beforeBuildCommand": "cd .. && npx expo export --platform web --output-dir dist",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "皮卡丘的音乐站",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "label": "main",
+        "decorations": false,
+        "transparent": false,
+        "shadow": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' tauri: ipc: http://ipc.localhost http://localhost:8080",
+        "connect-src": "'self' tauri: ipc: http://ipc.localhost http://localhost:8080 ws://localhost:*",
+        "img-src": "'self' tauri: asset: http://asset.localhost data: blob: https:",
+        "media-src": "'self' tauri: asset: http://asset.localhost https:",
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+        "script-src": ["'self'"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis", "msi"],
+    "icon": [
+      "icons/icon.png"
+    ],
+    "externalBin": ["binaries/go-music-api"],
+    "category": "Music",
+    "shortDescription": "皮卡丘的音乐站",
+    "longDescription": "AI 生成的皮卡丘主题音乐播放器，支持多平台搜索、歌词同步、收藏、播放列表。Tauri 桌面壳 + Expo Web 前端。"
+  }
+}

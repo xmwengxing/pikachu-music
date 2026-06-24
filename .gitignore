@@ -9,6 +9,15 @@ dist/
 web-build/
 expo-env.d.ts
 
+# canvaskit-wasm：从 node_modules/canvaskit-wasm/bin/full/canvaskit.wasm 复制到 public/ 给 web 用
+# dev / build 时由 public/ 静态服务，提交进 git 会让 repo 多 8MB
+# 需要重新生成就: cp node_modules/canvaskit-wasm/bin/full/canvaskit.wasm public/canvaskit.wasm
+public/canvaskit.wasm
+
+# Legacy code backup (cloned from a webpage before this project was rewritten as React Native)
+# Keep local-only for reference; not pushed to GitHub. Delete after project stabilizes.
+legacy-clone/
+
 # Native
 .kotlin/
 *.orig.*
@@ -43,3 +52,12 @@ yarn-error.*
 # Release signing
 android/app/release.keystore
 android/app/.keystore.env
+
+# Tauri
+# src-tauri/target/ 编译产物几百 MB，git 忽略
+# src-tauri/gen/    Tauri 生成的 schemas，build 时自动重建
+src-tauri/target/
+src-tauri/gen/
+
+# Expo + Tauri 协调
+# 之前 legacy-clone 备份 public/canvaskit.wasm 都在 .gitignore 里

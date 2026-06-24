@@ -98,7 +98,7 @@ export default function BackgroundParticles() {
   }, true);
 
   return (
-    <View pointerEvents="none" style={styles.container}>
+    <View style={[styles.container, { pointerEvents: 'none' }]}>
       <Canvas style={StyleSheet.absoluteFill}>
         <Group>
           {particles.map((p, i) => (
