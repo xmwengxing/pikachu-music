@@ -4,8 +4,8 @@
   "version": "1.0.27",
   "identifier": "com.pikachu.music",
   "build": {
-    "beforeDevCommand": "cd .. && npx expo start --web --port 1420",
-    "beforeBuildCommand": "cd .. && npx expo export --platform web --output-dir dist",
+    "beforeDevCommand": "npm run web",
+    "beforeBuildCommand": "npm run web:build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
