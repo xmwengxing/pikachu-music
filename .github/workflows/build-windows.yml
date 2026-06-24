@@ -35,22 +35,18 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Install npm dependencies
+        # devDependencies 里有 @tauri-apps/cli@^2.0.0，npm ci 装到 node_modules
+        # tauri build 会从本地 .bin/ 调起，不会全局装 v1 的旧 CLI
         run: npm ci
 
       - name: Build Tauri Windows installer
-        # tauri-apps/tauri-action 自动处理 MSVC 激活、webview2-com 链接、
-        # sidecar 注入（go-music-api-x86_64-pc-windows-msvc.exe 已在 src-tauri/binaries/）。
-        # beforeBuildCommand（tauri.conf.json 里写的 `cd .. && npx expo export --platform web`）
-        # 由 tauri build 自身触发，这里不用再单独跑。
-        uses: tauri-apps/tauri-action@v0
-        with:
-          projectPath: src-tauri
-          args: --bundles nsis,msi
-          # tagName 用占位符：不打 tag 时不会触发 release，只走 build
-          tagName: '__VERSION__'
-          releaseName: 'pikachu-music v__VERSION__'
-          releaseDraft: true
-          # 留 autoCancel 开启：PR 流水线后 push 新提交会取消正在跑的旧 build
+        # 不用 tauri-apps/tauri-action@v0 那个 action —— 它是给 Tauri 1 写的，
+        # 会硬装 @tauri-apps/cli@v1 然后跑 `tauri init --ci`，跟我们 Tauri 2 + 已有项目冲突。
+        # 直接走我们自己的脚本（package.json 里 tauri:build:win）用本地装的 CLI v2。
+        # beforeBuildCommand 由 tauri build 自己触发（`cd .. && npx expo export --platform web`），
+        # MSVC + WebView2 windows-latest runner 都已经预装好。
+        run: npm run tauri:build:win
+        shell: pwsh
 
       - name: Verify installer artifacts exist
         shell: pwsh
