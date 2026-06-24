@@ -1,0 +1,69 @@
+name: Build Tauri Windows Installer
+
+# 触发：每次 push / PR 到 master；或手动在 Actions 页面 "Run workflow"
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows installer (.msi + NSIS .exe)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust (x86_64-pc-windows-msvc)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri Windows installer
+        # tauri-apps/tauri-action 自动处理 MSVC 激活、webview2-com 链接、
+        # sidecar 注入（go-music-api-x86_64-pc-windows-msvc.exe 已在 src-tauri/binaries/）。
+        # beforeBuildCommand（tauri.conf.json 里写的 `cd .. && npx expo export --platform web`）
+        # 由 tauri build 自身触发，这里不用再单独跑。
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: src-tauri
+          args: --bundles nsis,msi
+          # tagName 用占位符：不打 tag 时不会触发 release，只走 build
+          tagName: '__VERSION__'
+          releaseName: 'pikachu-music v__VERSION__'
+          releaseDraft: true
+          # 留 autoCancel 开启：PR 流水线后 push 新提交会取消正在跑的旧 build
+
+      - name: Verify installer artifacts exist
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Include *.exe,*.msi |
+            Select-Object FullName, Length
+
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: pikachu-music-windows-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
+          retention-days: 30
